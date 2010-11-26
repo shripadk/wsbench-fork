@@ -1,0 +1,143 @@
+#!/bin/env node
+
+var OptionParser = require('./lib/optparse').OptionParser;
+var sys = require('sys');
+var url = require('url');
+var WebSocket = require('./lib/websocket').WebSocket;
+var assert = require('assert');
+
+var OPTIONS = {
+    connections : 10,
+    rate : 0,
+    session : function(ws) {
+        var ALPHABET = function() {
+            var a = '';
+            for (i = 0; i < 100; i++) {
+                a += String.fromCharCode(97 + Math.floor(Math.random() * 26));
+            }
+
+            return a;
+        }();
+
+        ws.onopen = function() {
+            // for (i = 0; i < OPTIONS.msgs; i++) {
+            //     var m = '';
+            //     var len = OPTIONS.msgSize;
+            //     var off = Math.floor(Math.random() * ALPHABET.length);
+            //     while (len > 0) {
+            //         var l = Math.min(len, ALPHABET.length - off)
+            //         m += ALPHABET.substr(off, l);
+            //         len -= l;
+            //     }
+            // 
+            //     ws.send(m);
+            // }
+            // 
+            // ws.close();
+        };
+    },
+    msgs : 0,
+    msgSize : 32
+};
+
+var op = new OptionParser([
+    ['-c', '--num-conns NUMBER',
+        'number of connections to open (default: 10)'
+    ],
+    ['-h', '--help',
+        'display this help'
+    ],
+    ['-m', '--num-msgs NUMBER',
+        'number of messages per connection (dfeault: 0)'
+    ],
+    ['-p', '--protocol PROTO',
+        'set the Web Socket protocol to use (default: empty)'
+    ],
+    ['-r', '--rate NUMBER',
+        'number of connections per second (default: 0)'
+    ],
+    ['-s', '--msg-size NUMBER',
+        'size of messages to send, in bytes (default: 32)'
+    ],
+    ['-S', '--session FILE',
+        'file to use for session logic (default: None)'
+    ]
+]);
+
+op.on('num-conns', function(o, v) {
+    OPTIONS.connections = v;
+});
+op.on('help', function() {
+    console.log(op.toString());
+    process.exit(0);
+});
+op.on('protocol', function(o, v) {
+    OPTIONS.protocol = v;
+});
+op.on('rate', function(o, v) {
+    OPTIONS.rate = v;
+});
+op.on('session', function(o, v) {
+    if (v.length > 3 && v.substring(v.length - 3) === '.js') {
+        v = v.substring(0, v.length - 3);
+    }
+
+    if (v[0] !== '/') {
+        v = './' + v;
+    }
+
+    OPTIONS.session = require(v);
+});
+op.on('num-msgs', function(o, v) {
+    OPTIONS.msgs = v;
+});
+op.on('msg-size', function(o, v) {
+    OPTIONS.msgSize = v;
+});
+op.on(2, function(v) {
+    OPTIONS.url = v;
+});
+
+op.banner = 'usage: wsbench [options] <url>\n' +
+'\n' +
+'Kick off a benchmarking run against the given ws:// URL.\n' +
+'\n' +
+'We can execute our workload in one of two ways: serially, wherein each\n' +
+'connection is closed before the next is initiated; or in parallel, wherein\n' +
+'a desired rate is specified and connections initiated to meet this rate,\n' +
+'independent of the state of other connections. Serial execution is the\n' +
+'default, and parallel execution can be specified using the -r <rate>\n' +
+'option. Parallel execution is bounded by the total number of connections\n' +
+'to be made, specified by the -c option.'
+
+op.parse(process.argv);
+
+if (!OPTIONS.url) {
+    console.error('wsbench: missing required <url> parameter');
+    console.log('');
+    console.log(op.toString());
+    process.exit(1);
+}
+
+var wsOpen = 0;
+var wsClose = 0;
+var wsErr = 0;
+
+var createWebSocket = function() {
+    var ws = new WebSocket(OPTIONS.url, OPTIONS.protocol);
+    OPTIONS.session(ws);
+
+    wsOpen++;
+    ws.onerror = function(e) {
+        wsErr++;
+        ws.close();
+    };
+
+    ws.onclose = function() {
+        wsClose++;
+    };
+
+    return ws;
+};
+
+setInterval(createWebSocket, 10);
