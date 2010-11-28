@@ -9,33 +9,6 @@ var assert = require('assert');
 var OPTIONS = {
     connections : 10,
     rate : 0,
-    session : function(ws) {
-        var ALPHABET = function() {
-            var a = '';
-            for (i = 0; i < 100; i++) {
-                a += String.fromCharCode(97 + Math.floor(Math.random() * 26));
-            }
-
-            return a;
-        }();
-
-        ws.onopen = function() {
-            // for (i = 0; i < OPTIONS.msgs; i++) {
-            //     var m = '';
-            //     var len = OPTIONS.msgSize;
-            //     var off = Math.floor(Math.random() * ALPHABET.length);
-            //     while (len > 0) {
-            //         var l = Math.min(len, ALPHABET.length - off)
-            //         m += ALPHABET.substr(off, l);
-            //         len -= l;
-            //     }
-            // 
-            //     ws.send(m);
-            // }
-            // 
-            // ws.close();
-        };
-    },
     msgs : 0,
     msgSize : 32
 };
@@ -128,16 +101,21 @@ var createWebSocket = function() {
     OPTIONS.session(ws);
 
     wsOpen++;
+    ws.onopen  = function() {
+        console.log("Number of connections opened: " + wsOpen);
+        createWebSocket();
+    }
     ws.onerror = function(e) {
         wsErr++;
         ws.close();
     };
 
     ws.onclose = function() {
+        wsOpen--;
         wsClose++;
     };
 
     return ws;
 };
 
-setInterval(createWebSocket, 10);
+createWebSocket();
