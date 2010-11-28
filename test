@@ -98,7 +98,7 @@ var wsErr = 0;
 
 var createWebSocket = function() {
     var ws = new WebSocket(OPTIONS.url, OPTIONS.protocol);
-    OPTIONS.session(ws);
+  //  OPTIONS.session(ws);
 
     wsOpen++;
     ws.onopen  = function() {
